@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+  tg.expand();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Symphony of Resistance</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; background:#05070d; overflow:hidden; font-family:'Courier New',monospace; touch-action:none; }
+  canvas { display:block; width:100vw; height:100vh; }
+  button, .tbtn { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  /* ===== МЕНЮ ===== */
+  #menu { position:fixed; inset:0; background:#05070d; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:10; }
+  #title { color:#5b8ff2; letter-spacing:8px; font-size:clamp(18px,4vw,34px); text-shadow:0 0 12px #1d4ed8; }
+  #subtitle { color:#7a8699; letter-spacing:5px; font-size:clamp(10px,2.2vw,15px); }
+  #cards { display:flex; gap:26px; flex-wrap:wrap; justify-content:center; padding:0 10px; }
+  .card { width:160px; padding:16px 8px; text-align:center; background:#0b111c; border:2px solid #26324a; cursor:pointer; user-select:none; transition:transform .1s; }
+  .card.sel-v { border-color:#3fbf8f; box-shadow:0 0 14px #0f7a5544; }
+  .card.sel-s { border-color:#e05252; box-shadow:0 0 14px #7a222244; }
+  .card canvas { width:64px; height:64px; image-rendering:pixelated; }
+  .cname { margin-top:10px; font-size:14px; letter-spacing:2px; }
+  .cname.v { color:#3fbf8f; } .cname.s { color:#e05252; }
+  .cinfo { margin-top:8px; color:#8b95a8; font-size:11px; line-height:1.5; letter-spacing:1px; }
+  #startBtn { margin-top:6px; padding:14px 58px; background:none; border:1px solid #7a8699; color:#e8ecf4; font-family:inherit; font-size:20px; letter-spacing:6px; cursor:pointer; }
+  #startBtn:hover { border-color:#5b8ff2; color:#5b8ff2; }
+  #hint { color:#5a6478; font-size:11px; letter-spacing:1px; text-align:center; line-height:1.9; padding:0 16px; }
+  /* ===== HUD ===== */
+  #hud { position:fixed; top:10px; left:12px; right:12px; display:none; z-index:5; pointer-events:none; }
+  #hpbar { width:min(300px,50vw); height:14px; border:1px solid #4a5568; background:#0b111c; }
+  #hpfill { height:100%; background:linear-gradient(90deg,#e05252,#ff8a5c); width:100%; transition:width .15s; }
+  #armorbar { width:min(300px,50vw); height:8px; border:1px solid #2a4a6a; background:#0b111c; margin-top:4px; display:none; }
+  #armorfill { height:100%; background:linear-gradient(90deg,#3fa0e0,#7fd7ff); width:100%; transition:width .15s; }
+  #stats { color:#9aa6ba; font-size:12px; margin-top:6px; letter-spacing:1px; }
+  #wave { position:fixed; top:12px; right:16px; color:#5b8ff2; font-size:16px; letter-spacing:3px; z-index:5; display:none; }
+  /* ===== МОБИЛЬНОЕ УПРАВЛЕНИЕ ===== */
+  #touchUI { position:fixed; inset:0; z-index:6; display:none; pointer-events:none; }
+  #joy { position:absolute; left:24px; bottom:28px; width:120px; height:120px; border:2px solid #ffffff22; border-radius:50%; pointer-events:auto; touch-action:none; }
+  #knob { position:absolute; left:50%; top:50%; width:48px; height:48px; margin:-24px; background:#ffffff2e; border-radius:50%; }
+  .tbtn { position:absolute; width:66px; height:66px; border-radius:50%; border:2px solid #ffffff30; background:#ffffff14; color:#e8ecf4; font-family:inherit; font-size:11px; letter-spacing:1px; pointer-events:auto; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+  #bShoot { right:24px; bottom:110px; border-color:#5b8ff266; }
+  #bSpec  { right:100px; bottom:40px; border-color:#e0525266; }
+  #bDash  { right:26px; bottom:32px; border-color:#3fbf8f66; }
+  /* ===== GAME OVER ===== */
+  #gameover { position:fixed; inset:0; background:#05070dE8; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:9; }
+  #goTitle { color:#e05252; font-size:28px; letter-spacing:6px; }
+  #goScore { color:#9aa6ba; font-size:15px; letter-spacing:2px; }
+  #restart { padding:12px 44px; background:none; border:1px solid #7a8699; color:#e8ecf4; font-family:inherit; font-size:16px; letter-spacing:4px; cursor:pointer; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="menu">
+  <div id="title">SYMPHONY OF RESISTANCE</div>
+  <div id="subtitle">Изометрический экшен</div>
+  <div id="cards">
+    <div class="card" id="cardV">
+      <canvas id="icoV" width="16" height="16"></canvas>
+      <div class="cname v">V — Tech</div>
+      <div class="cinfo">HP: 100 &nbsp;·&nbsp; Ловкость<br>Пулемёт + Клинок<br>Улучшенный рывок</div>
+    </div>
+    <div class="card" id="cardS">
+      <canvas id="icoS" width="16" height="16"></canvas>
+      <div class="cname s">S — Assault</div>
+      <div class="cinfo">HP: 180 &nbsp;·&nbsp; Сила<br>Броня (восстанавливается)<br>Дробовик + Граната</div>
+    </div>
+  </div>
+  <button id="startBtn">НАЧАТЬ</button>
+  <div id="hint">WASD — движение · ЛКМ (удерживать) — огонь · ПКМ — спец-атака<br>SHIFT — рывок · TAB — смена стиля<br>На телефоне: джойстик + кнопки</div>
+</div>
+
+<div id="hud">
+  <div id="hpbar"><div id="hpfill"></div></div>
+  <div id="armorbar"><div id="armorfill"></div></div>
+  <div id="stats"></div>
+</div>
+<div id="wave"></div>
+
+<div id="touchUI">
+  <div id="joy"><div id="knob"></div></div>
+  <button class="tbtn" id="bShoot">ОГОНЬ</button>
+  <button class="tbtn" id="bSpec">УДАР</button>
+  <button class="tbtn" id="bDash">РЫВОК</button>
+</div>
+
+<div id="gameover">
+  <div id="goTitle">ПОРАЖЕНИЕ</div>
+  <div id="goScore"></div>
+  <button id="restart">ЗАНОВО</button>
+</div>
+
+<script>
+'use strict';
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W=0,H=0;
+function resize(){
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (typeof tg !== 'undefined' && tg.viewportHeight) {
+    cv.width = tg.viewportWidth;
+    cv.height = tg.viewportHeight;
+  } else {
+    cv.width = w;
+    cv.height = h;
+  }
+}
+addEventListener('resize',resize); resize();
+
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
+
+/* ---------- Персонажи ---------- */
+const CLASSES = {
+  v: { name:'V-Tech', hp:100, speed:3.2, dashCd:20, dashPow:16, dashInv:16,
+       gun:{ name:'Пулемёт', dmg:7, cd:4, spread:0.10, pellets:1, speed:12, range:520, color:'#7fd7ff', shake:0.6 },
+       spec:{ type:'melee', name:'Клинок', dmg:34, cd:16, range:78, arc:1.6, color:'#3fbf8f' } },
+  s: { name:'S-Assault', hp:180, speed:2.3, dashCd:40, dashPow:14, dashInv:14, armorMax:60,
+       gun:{ name:'Дробовик', dmg:9, cd:30, spread:0.42, pellets:6, speed:9, range:420, color:'#ffb347', shake:4 },
+       spec:{ type:'grenade', name:'Граната', dmg:55, cd:100, radius:100, range:260, speed:7, color:'#c8e06a' } }
+};
+
+/* ---------- Состояние ---------- */
+let state='menu', hero=null, cls=null, wave=1, waveTimer=0, score=0, kills=0;
+let enemies=[], bullets=[], grenades=[], booms=[], parts=[], texts=[];
+let keys={}, mouse={x:0,y:0,down:false};
+let shake=0;
+
+function spawnEnemy(){
+  const side = Math.floor(Math.random()*4);
+  let x,y;
+  if(side===0){ x=Math.random()*W; y=-30; }
+  else if(side===1){ x=W+30; y=Math.random()*H; }
+  else if(side===2){ x=Math.random()*W; y=H+30; }
+  else { x=-30; y=Math.random()*H; }
+  const r=Math.random();
+  let type;
+  if(wave>=3 && r<0.22) type='fast';
+  else if(wave>=5 && r<0.38) type='tank';
+  else type='grunt';
+  const cfg = {
+    grunt:{ hp:22, spd:1.0+wave*0.05, r:12, dmg:10, col:'#e05252' },
+    fast: { hp:14, spd:2.1+wave*0.06, r:9,  dmg:8,  col:'#ff9c4f' },
+    tank: { hp:70, spd:0.6+wave*0.03, r:18, dmg:18, col:'#b05cf0' }
+  }[type];
+  enemies.push({x,y,type,hp:cfg.hp,maxhp:cfg.hp,spd:cfg.spd,r:cfg.r,dmg:cfg.dmg,col:cfg.col,hit:0,ph:Math.random()*6.28});
+}
+
+/* ---------- Урон и эффекты ---------- */
+function hitText(x,y,t,col){ texts.push({x,y,t,col,life:40}); }
+function burst(x,y,col,n){ for(let i=0;i<n;i++){ const a=Math.random()*6.28,s=1+Math.random()*3;
+  parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:20+Math.random()*20,col}); } }
+
+function damageEnemy(e,dmg,kx,ky){
+  e.hp-=dmg; e.hit=8; e.x+=kx*6; e.y+=ky*6;
+  hitText(e.x,e.y-e.r-6,'-'+Math.round(dmg),'#ffd166');
+  burst(e.x,e.y,e.col,5);
+  if(e.hp<=0){
+    enemies.splice(enemies.indexOf(e),1);
+    kills++; score+=e.type==='tank'?30:(e.type==='fast'?15:10);
+    burst(e.x,e.y,e.col,14); shake=Math.min(shake+3,10);
+  }
+}
+function damageHero(d){
+  if(hero.dashInv>0) return;
+  hero.lastHit=0;
+  if(hero.style==='s' && hero.armor>0){
+    const absorbed=Math.min(hero.armor,d);
+    hero.armor-=absorbed; d-=absorbed;
+    hitText(hero.x,hero.y-34,'ЩИТ -'+absorbed,'#7fd7ff');
+    burst(hero.x,hero.y,'#7fd7ff',4);
+  }
+  if(d>0){
+    hero.hp-=d; hero.flash=8;
+    hitText(hero.x,hero.y-24,'-'+d,'#ff5c5c');
+  }
+  shake=Math.min(shake+6,14);
+  if(hero.hp<=0){ state='dead';
+    document.getElementById('gameover').style.display='flex';
+    document.getElementById('goScore').textContent='СЧЁТ: '+score+'  ·  ВОЛНА: '+wave+'  ·  УБИЙСТВ: '+kills;
+  }
+}
+
+/* ---------- Атаки ---------- */
+function shoot(){
+  if(hero.gunCd>0) return;
+  const g=cls.gun; hero.gunCd=g.cd;
+  const a=Math.atan2(mouse.y-hero.y, mouse.x-hero.x);
+  for(let i=0;i<g.pellets;i++){
+    const aa=a+(Math.random()-0.5)*g.spread*2;
+    bullets.push({x:hero.x,y:hero.y,vx:Math.cos(aa)*g.speed,vy:Math.sin(aa)*g.speed,
+      dmg:g.dmg,life:g.range?g.range/g.speed:70,col:g.col,r:g.pellets>1?3:4});
+  }
+  shake=Math.min(shake+g.shake,8);
+  burst(hero.x+Math.cos(a)*14,hero.y+Math.sin(a)*14,g.col,3);
+}
+
+function special(){
+  const s=cls.spec;
+  if(s.type==='melee'){
+    if(hero.scd>0) return;
+    hero.scd=s.cd;
+    const a=Math.atan2(mouse.y-hero.y, mouse.x-hero.x);
+    hero.swing={a,life:12,max:12};
+    let hitAny=false;
+    for(const e of [...enemies]){
+      const dx=e.x-hero.x, dy=e.y-hero.y, d=Math.hypot(dx,dy);
+      if(d<s.range+e.r){
+        const ea=Math.atan2(dy,dx);
+        if(Math.abs(((ea-a+Math.PI*3)%(Math.PI*2))-Math.PI)<s.arc){
+          damageEnemy(e,s.dmg,dx/(d||1),dy/(d||1)); hitAny=true;
+        }
+      }
+    }
+    if(hitAny) shake=Math.min(shake+5,10);
+  } else {
+    if(hero.gcdN>0) return;
+    hero.gcdN=s.cd;
+    let tx,ty;
+    if(isTouch){ tx=hero.x+Math.cos(hero.face)*s.range; ty=hero.y+Math.sin(hero.face)*s.range; }
+    else { tx=mouse.x; ty=mouse.y; }
+    const dx=tx-hero.x, dy=ty-hero.y, d=Math.hypot(dx,dy);
+    if(d>s.range){ tx=hero.x+dx/d*s.range; ty=hero.y+dy/d*s.range; }
+    grenades.push({x:hero.x,y:hero.y,tx,ty,vx:(tx-hero.x)/36,vy:(ty-hero.y)/36,fuse:36,t:0,
+      dmg:s.dmg,radius:s.radius,col:s.color});
+  }
+}
+
+function explode(g){
+  booms.push({x:g.x,y:g.y,r:0,max:g.radius,life:20,col:g.color});
+  shake=Math.min(shake+9,14);
+  burst(g.x,g.y,'#ffb347',20);
+  burst(g.x,g.y,'#e05252',10);
+  for(const e of [...enemies]){
+    const d=Math.hypot(e.x-g.x,e.y-g.y);
+    if(d<g.radius+e.r){
+      const fall=1-d/(g.radius+e.r)*0.5;
+      const dx=(e.x-g.x)/(d||1), dy=(e.y-g.y)/(d||1);
+      damageEnemy(e,g.dmg*fall,dx,dy);
+    }
+  }
+}
+
+/* ---------- Ввод ---------- */
+addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Tab'){ e.preventDefault(); if(hero) switchStyle(); }
+  if(e.code==='ShiftLeft'||e.code==='ShiftRight') tryDash();
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+addEventListener('mousemove',e=>{mouse.x=e.clientX; mouse.y=e.clientY;});
+addEventListener('mousedown',e=>{ if(e.button===0) mouse.down=true; if(e.button===2) special(); });
+addEventListener('mouseup',e=>{ if(e.button===0) mouse.down=false; });
+addEventListener('contextmenu',e=>e.preventDefault());
+
+function switchStyle(){
+  const ns = hero.style==='v'?'s':'v';
+  hero.style=ns;
+  if(ns==='s') hero.armor=CLASSES.s.armorMax;
+  hero.gunCd=Math.max(hero.gunCd,12); hero.scd=Math.max(hero.scd,10); hero.gcdN=Math.max(hero.gcdN||0,20);
+  burst(hero.x,hero.y,ns==='s'?'#e05252':'#3fbf8f',10);
+  updSpecBtn();
+}
+
+/* мобильное управление */
+let joyActive=false, joyDX=0, joyDY=0;
+const joy=document.getElementById('joy'), knob=document.getElementById('knob');
+function joyMove(t){
+  const r=joy.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+  let dx=t.clientX-cx, dy=t.clientY-cy, d=Math.hypot(dx,dy), max=r.width/2;
+  if(d>max){ dx=dx/d*max; dy=dy/d*max; }
+  knob.style.transform='translate('+dx+'px,'+dy+'px)';
+  joyDX=dx/max; joyDY=dy/max;
+}
+joy.addEventListener('touchstart',e=>{joyActive=true;joyMove(e.touches[0]);e.preventDefault();});
+joy.addEventListener('touchmove',e=>{joyMove(e.touches[0]);e.preventDefault();});
+joy.addEventListener('touchend',()=>{joyActive=false;joyDX=joyDY=0;knob.style.transform='';});
+document.getElementById('bShoot').addEventListener('touchstart',e=>{mouse.down=true;e.preventDefault();});
+document.getElementById('bShoot').addEventListener('touchend',e=>{mouse.down=false;e.preventDefault();});
+document.getElementById('bSpec').addEventListener('touchstart',e=>{special();e.preventDefault();});
+document.getElementById('bDash').addEventListener('touchstart',e=>{tryDash();e.preventDefault();});
+
+function updSpecBtn(){
+  document.getElementById('bSpec').textContent = cls && cls.spec.type==='grenade' ? 'ГРАНАТА' : 'УДАР';
+}
+
+function tryDash(){
+  if(!hero||hero.dashCd>0) return;
+  let dx=keys.KeyD?1:0, dy=keys.KeyS?1:0;
+  if(keys.KeyA)dx-=1; if(keys.KeyW)dy-=1;
+  if(joyActive){ dx=joyDX; dy=joyDY; }
+  const d=Math.hypot(dx,dy);
+  if(d<0.1){ dx=Math.cos(hero.face); dy=Math.sin(hero.face); d=1; }
+  hero.dvx=dx/d*cls.dashPow; hero.dvy=dy/d*cls.dashPow;
+  hero.dashCd=cls.dashCd; hero.dashInv=cls.dashInv;
+  burst(hero.x,hero.y,'#5b8ff2',8);
+}
+
+/* ---------- Меню ---------- */
+let pick='v';
+document.getElementById('cardV').addEventListener('click',()=>{pick='v';updCards();});
+document.getElementById('cardS').addEventListener('click',()=>{pick='s';updCards();});
+function updCards(){
+  document.getElementById('cardV').className='card'+(pick==='v'?' sel-v':'');
+  document.getElementById('cardS').className='card'+(pick==='s'?' sel-s':'');
+}
+updCards();
+
+function drawIcon(id,style){
+  const c=document.getElementById(id), g=c.getContext('2d');
+  g.clearRect(0,0,16,16);
+  const body = style==='v' ? ['#1e7a5a','#2fa37c','#e8f2ee'] : ['#8a1f1f','#c23b3b','#f2d8d8'];
+  g.fillStyle=body[0]; g.fillRect(5,7,6,7);
+  g.fillStyle=body[1]; g.fillRect(4,3,8,5);
+  g.fillStyle=body[2]; g.fillRect(6,4,4,2);
+  g.fillStyle=body[1]; g.fillRect(3,8,1,4); g.fillRect(12,8,1,4);
+  g.fillStyle='#0b0b0b'; g.fillRect(5,14,2,2); g.fillRect(9,14,2,2);
+}
+drawIcon('icoV','v'); drawIcon('icoS','s');
+
+document.getElementById('startBtn').addEventListener('click',start);
+document.getElementById('restart').addEventListener('click',()=>{
+  document.getElementById('gameover').style.display='none'; start();
+});
+
+function start(){
+  cls = CLASSES[pick];
+  hero = { x:W/2, y:H/2, hp:cls.hp, maxhp:cls.hp, face:0, style:pick,
+    armor:pick==='s'?cls.armorMax:0, lastHit:999,
+    gunCd:0, scd:0, gcdN:0, dashCd:0, dashInv:0, dvx:0, dvy:0, flash:0, swing:null };
+  enemies=[]; bullets=[]; grenades=[]; booms=[]; parts=[]; texts=[];
+  wave=1; waveTimer=0; score=0; kills=0; state='play';
+  document.getElementById('menu').style.display='none';
+  document.getElementById('hud').style.display='block';
+  document.getElementById('wave').style.display='block';
+  document.getElementById('touchUI').style.display=isTouch?'block':'none';
+  updSpecBtn();
+}
+
+/* ---------- Апдейт ---------- */
+function update(){
+  let dx=keys.KeyD?1:0, dy=keys.KeyS?1:0;
+  if(keys.KeyA)dx-=1; if(keys.KeyW)dy-=1;
+  if(joyActive){ dx=joyDX; dy=joyDY; }
+  const d=Math.hypot(dx,dy);
+  if(d>0.1){ dx/=Math.max(d,1); dy/=Math.max(d,1); }
+  if(hero.dvx||hero.dvy){ hero.x+=hero.dvx; hero.y+=hero.dvy; hero.dvx*=0.82; hero.dvy*=0.82;
+    if(Math.abs(hero.dvx)<0.4)hero.dvx=0; if(Math.abs(hero.dvy)<0.4)hero.dvy=0; }
+  hero.x+=dx*cls.speed; hero.y+=dy*cls.speed;
+  hero.x=Math.max(16,Math.min(W-16,hero.x)); hero.y=Math.max(16,Math.min(H-16,hero.y));
+  hero.face=Math.atan2(mouse.y-hero.y,mouse.x-hero.x);
+  if(hero.gunCd>0)hero.gunCd--;
+  if(hero.scd>0)hero.scd--;
+  if(hero.gcdN>0)hero.gcdN--;
+  if(hero.dashCd>0)hero.dashCd--; if(hero.dashInv>0)hero.dashInv--;
+  if(hero.flash>0)hero.flash--;
+  if(hero.swing){ hero.swing.life--; if(hero.swing.life<=0)hero.swing=null; }
+  if(mouse.down) shoot();
+
+  hero.lastHit++;
+  if(hero.style==='s' && hero.armor<cls.armorMax && hero.lastHit>180)
+    hero.armor=Math.min(cls.armorMax,hero.armor+0.08);
+
+  waveTimer--;
+  if(waveTimer<=0){
+    waveTimer=Math.max(120,240-wave*6);
+    for(let i=0;i<Math.min(3+wave,14);i++) setTimeout(spawnEnemy, i*180);
+  }
+
+  for(const e of enemies){
+    const ex=hero.x-e.x, ey=hero.y-e.y, dist=Math.hypot(ex,ey)||1;
+    e.ph+=0.1;
+    e.x+=(ex/dist)*e.spd+Math.cos(e.ph)*0.4;
+    e.y+=(ey/dist)*e.spd+Math.sin(e.ph)*0.4;
+    if(e.hit>0)e.hit--;
+    if(dist<e.r+14) damageHero(e.dmg);
+  }
+
+  for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i]; b.x+=b.vx; b.y+=b.vy; b.life--;
+    if(b.life<=0||b.x<-20||b.x>W+20||b.y<-20||b.y>H+20){ bullets.splice(i,1); continue; }
+    for(const e of enemies){
+      if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+b.r){ damageEnemy(e,b.dmg,b.vx/10,b.vy/10); bullets.splice(i,1); break; }
+    }
+  }
+
+  for(let i=grenades.length-1;i>=0;i--){
+    const g=grenades[i]; g.t++;
+    if(g.t<g.fuse){ g.x+=g.vx; g.y+=g.vy; g.vx*=0.94; g.vy*=0.94; }
+    else { explode(g); grenades.splice(i,1); }
+  }
+  for(let i=booms.length-1;i>=0;i--){ const b=booms[i]; b.life--; if(b.life<=0)booms.splice(i,1); }
+
+  for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.05; if(--p.life<=0)parts.splice(i,1); }
+  for(let i=texts.length-1;i>=0;i--){ const t=texts[i]; t.y-=0.7; if(--t.life<=0)texts.splice(i,1); }
+  if(shake>0)shake-=0.5;
+
+  document.getElementById('hpfill').style.width=Math.max(0,hero.hp/hero.maxhp*100)+'%';
+  const ab=document.getElementById('armorbar');
+  ab.style.display = hero.style==='s' ? 'block' : 'none';
+  document.getElementById('armorfill').style.width=Math.max(0,hero.armor/cls.armorMax*100)+'%';
+  const specReady = cls.spec.type==='grenade' ? hero.gcdN<=0 : hero.scd<=0;
+  document.getElementById('stats').textContent=
+    cls.name+' · '+cls.gun.name+' · '+cls.spec.name+': '+(specReady?'ГОТОВ':'···')+' · СЧЁТ: '+score;
+  document.getElementById('wave').textContent='ВОЛНА '+wave;
+}
+
+/* ---------- Отрисовка ---------- */
+function isoGrid(){
+  ctx.strokeStyle='#101726'; ctx.lineWidth=1;
+  const s=48;
+  for(let x=(W/2)%s;x<W;x+=s){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H*0.3,H); ctx.stroke(); }
+  for(let y=(H/2)%s;y<H;y+=s){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+}
+function drawHero(){
+  const x=hero.x,y=hero.y;
+  ctx.save(); ctx.translate(x,y);
+  if(hero.dashInv>0) ctx.globalAlpha=0.55;
+  ctx.fillStyle='#00000055'; ctx.beginPath(); ctx.ellipse(0,10,14,6,0,0,6.28); ctx.fill();
+  const col = hero.style==='v'?['#2fa37c','#1e7a5a','#e8f2ee']:['#c23b3b','#8a1f1f','#f2d8d8'];
+  const fc = hero.flash>0?'#fff':col[0];
+  ctx.fillStyle=fc; ctx.fillRect(-7,-4,14,12);
+  ctx.fillStyle=col[1]; ctx.fillRect(-6,-14,12,10);
+  ctx.fillStyle=col[2]; ctx.fillRect(-3,-12,6,4);
+  if(hero.style==='s' && hero.armor>0){
+    ctx.strokeStyle='rgba(127,215,255,'+(0.25+0.5*hero.armor/cls.armorMax)+')';
+    ctx.lineWidth=2; ctx.strokeRect(-9,-6,18,16);
+  }
+  ctx.rotate(hero.face);
+  ctx.fillStyle=hero.style==='v'?'#9aa6ba':'#6b4a2f';
+  ctx.fillRect(8,-2,12,4);
+  ctx.restore();
+  if(hero.swing){
+    const s=cls.spec, p=1-hero.swing.life/hero.swing.max;
+    ctx.save(); ctx.translate(x,y); ctx.rotate(hero.swing.a);
+    ctx.strokeStyle=s.color; ctx.lineWidth=4; ctx.globalAlpha=1-p;
+    ctx.beginPath(); ctx.arc(0,0,s.range,-s.arc/2+p*0.6,s.arc/2+p*0.6); ctx.stroke(); ctx.restore();
+  }
+  ctx.fillStyle='#ffffff22';
+  if(hero.style==='v') ctx.fillRect(x-14,y+16,28*(1-hero.scd/cls.spec.cd),3);
+  else ctx.fillRect(x-14,y+16,28*(1-hero.gcdN/cls.spec.cd),3);
+}
+function drawEnemy(e){
+  ctx.save(); ctx.translate(e.x,e.y);
+  ctx.fillStyle='#00000044'; ctx.beginPath(); ctx.ellipse(0,e.r*0.7,e.r,e.r*0.4,0,0,6.28); ctx.fill();
+  const bob=Math.sin(e.ph)*2;
+  ctx.fillStyle=e.hit>0?'#fff':e.col;
+  ctx.fillRect(-e.r*0.7,-e.r*0.8+bob,e.r*1.4,e.r*1.2);
+  ctx.fillStyle='#0b0b0b'; ctx.fillRect(-e.r*0.4,-e.r*0.4+bob,e.r*0.8,e.r*0.3);
+  if(e.hp<e.maxhp){ ctx.fillStyle='#00000066'; ctx.fillRect(-e.r,-e.r-8+bob,e.r*2,3);
+    ctx.fillStyle='#e05252'; ctx.fillRect(-e.r,-e.r-8+bob,e.r*2*e.hp/e.maxhp,3); }
+  ctx.restore();
+}
+function draw(){
+  ctx.save();
+  if(shake>0) ctx.translate((Math.random()-0.5)*shake,(Math.random()-0.5)*shake);
+  ctx.fillStyle='#0a0f18'; ctx.fillRect(-20,-20,W+40,H+40);
+  isoGrid();
+  for(const b of bullets){ ctx.fillStyle=b.col; ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,6.28); ctx.fill();
+    ctx.strokeStyle=b.col+'55'; ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(b.x-b.vx*2,b.y-b.vy*2); ctx.stroke(); }
+  for(const g of grenades){
+    ctx.fillStyle=(g.t%8<4)?g.col:'#e05252';
+    ctx.beginPath(); ctx.arc(g.x,g.y,5,0,6.28); ctx.fill();
+  }
+  enemies.sort((a,b)=>a.y-b.y);
+  for(const e of enemies) drawEnemy(e);
+  if(hero) drawHero();
+  for(const b of booms){
+    const p=1-b.life/20, r=b.max*p;
+    ctx.globalAlpha=1-p;
+    ctx.strokeStyle=b.col; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.arc(b.x,b.y,r,0,6.28); ctx.stroke();
+    ctx.globalAlpha=(1-p)*0.4;
+    ctx.fillStyle='#ffb347'; ctx.beginPath(); ctx.arc(b.x,b.y,r,0,6.28); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+  for(const p of parts){ ctx.globalAlpha=Math.min(1,p.life/20); ctx.fillStyle=p.col; ctx.fillRect(p.x,p.y,3,3); }
+  ctx.globalAlpha=1;
+  ctx.font='12px "Courier New"'; ctx.textAlign='center';
+  for(const t of texts){ ctx.globalAlpha=Math.min(1,t.life/25); ctx.fillStyle=t.col; ctx.fillText(t.t,t.x,t.y); }
+  ctx.globalAlpha=1;
+  ctx.restore();
+}
+
+function loop(t){
+  requestAnimationFrame(loop);
+  if(state==='play') update();
+  if(state!=='menu') draw();
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
